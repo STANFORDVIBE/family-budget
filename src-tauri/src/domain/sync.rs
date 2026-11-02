@@ -1,4 +1,4 @@
-//! Contract for a future cloud synchronization. Version 1.0 is local-only: the app records which
+//! Contract for a future cloud synchronization. The current version is local-only: the app records which
 //! rows changed (see `sync_metadata`) and ships `LocalOnlyProvider`, which never sends anything.
 //! A real provider plugs in here without touching the financial logic.
 

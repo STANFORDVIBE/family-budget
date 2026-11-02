@@ -72,7 +72,7 @@ db/         (Rust)                Infrastructure: подключение SQLite,
 
 - UUID v7 для всех записей, `version` + `updated_at` + `deleted_at` у каждой синхронизируемой строки;
 - `sync_metadata` — какие строки изменились локально (dirty) и какая версия была синхронизирована;
-- `domain::sync::SyncProvider` — контракт push/pull; в 1.0 стоит `LocalOnlyProvider`, который ничего не отправляет;
+- `domain::sync::SyncProvider` — контракт push/pull; в текущей версии стоит `LocalOnlyProvider`, который ничего не отправляет;
 - `domain::sync::compare_versions` — обнаружение конфликтов (изменено с обеих сторон);
 - `users` и `workspace_members.user_id` — точка подключения облачных аккаунтов и ролей.
 
