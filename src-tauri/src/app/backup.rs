@@ -105,12 +105,22 @@ pub fn restore_from(db: &mut Database, source: &Path, backup_dir: &Path) -> AppR
     verify_file(source)?;
     let safety_name = unique_name(backup_dir, "before-restore-");
     backup_to(&db.conn, &backup_dir.join(&safety_name))?;
+    // The backup folder belongs to this computer, not to the data: it survives the restore
+    let folder: Option<String> = settings::read(&db.conn, "backup_dir")?;
     db.conn.restore(MAIN_DB, source, None::<fn(rusqlite::backup::Progress)>).map_err(|_| AppError::InvalidBackup)?;
     // An older backup is brought up to the current schema.
     db.prepare()?;
     if !integrity(&db.conn)?.ok {
         return Err(AppError::Integrity);
     }
+    match folder {
+        Some(folder) => settings::write(&db.conn, "backup_dir", &folder)?,
+        None => {
+            db.conn.execute("DELETE FROM app_settings WHERE key = 'backup_dir'", [])?;
+        }
+    }
+    // The safety copy above is the latest backup
+    settings::write(&db.conn, "last_backup_at", &now_millis())?;
     Ok(safety_name)
 }
 

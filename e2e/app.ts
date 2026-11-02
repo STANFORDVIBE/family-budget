@@ -1,6 +1,6 @@
 import { type Browser, type Page, chromium, test as base } from "@playwright/test";
 import { type ChildProcess, spawn } from "node:child_process";
-import { mkdtempSync, rmSync } from "node:fs";
+import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
 
@@ -28,8 +28,10 @@ async function waitFor(url: string, timeoutMs: number): Promise<void> {
 export interface AppHandle {
   page: Page;
   dataDir: string;
-  /** Restarts the app on the same data folder (checks persistence). */
-  restart: () => Promise<Page>;
+  /** Restarts the app on the same data folder (checks persistence); `whileStopped` runs in between. */
+  restart: (whileStopped?: () => void) => Promise<Page>;
+  /** Answers the next native file dialog with this path (debug builds only, see commands/data.rs). */
+  answerDialog: (file: string) => void;
 }
 
 let port = 9400;
@@ -76,11 +78,13 @@ export const test = base.extend<{ app: AppHandle }>({
         return run.page;
       },
       dataDir,
-      restart: async () => {
+      restart: async (whileStopped) => {
         await close(run);
+        whileStopped?.();
         run = await launch(dataDir);
         return run.page;
       },
+      answerDialog: (file) => writeFileSync(path.join(dataDir, "e2e-dialog.txt"), file),
     });
     await close(run);
     rmSync(dataDir, { recursive: true, force: true, maxRetries: 5, retryDelay: 300 });

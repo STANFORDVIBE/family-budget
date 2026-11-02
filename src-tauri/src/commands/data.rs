@@ -5,7 +5,7 @@ use std::path::PathBuf;
 
 use serde::Serialize;
 use tauri::AppHandle;
-use tauri_plugin_dialog::DialogExt;
+use tauri_plugin_dialog::{DialogExt, FilePath};
 use tauri_plugin_opener::OpenerExt;
 
 use super::St;
@@ -41,8 +41,17 @@ fn status(state: &St<'_>) -> AppResult<BackupStatus> {
     })
 }
 
-fn picked(path: Option<tauri_plugin_dialog::FilePath>) -> AppResult<PathBuf> {
-    path.ok_or(AppError::Cancelled)?.into_path().map_err(|_| AppError::Cancelled)
+/// Shows a native file dialog. Debug builds started by the end-to-end tests take the answer from
+/// `e2e-dialog.txt` in the data folder instead (one answer per dialog); release builds never do.
+fn ask(state: &St<'_>, dialog: impl FnOnce() -> Option<FilePath>) -> AppResult<PathBuf> {
+    if cfg!(debug_assertions) && std::env::var_os("FAMILY_BUDGET_E2E").is_some() {
+        let answer = state.data_dir.join("e2e-dialog.txt");
+        if let Ok(text) = std::fs::read_to_string(&answer) {
+            let _ = std::fs::remove_file(&answer);
+            return Ok(PathBuf::from(text.trim()));
+        }
+    }
+    dialog().ok_or(AppError::Cancelled)?.into_path().map_err(|_| AppError::Cancelled)
 }
 
 #[tauri::command]
@@ -70,13 +79,13 @@ pub async fn restore_backup(state: St<'_>, name: String) -> AppResult<String> {
 
 #[tauri::command]
 pub async fn restore_backup_from_file(app: AppHandle, state: St<'_>) -> AppResult<String> {
-    let source = picked(
+    let source = ask(&state, || {
         app.dialog()
             .file()
             .set_title("Выберите резервную копию")
             .add_filter("Резервная копия Family Budget", &[EXTENSION, "db"])
-            .blocking_pick_file(),
-    )?;
+            .blocking_pick_file()
+    })?;
     state.with_db(|db| {
         let dir = state.backup_dir(db)?;
         backup::restore_from(db, &source, &dir)
@@ -89,13 +98,13 @@ pub async fn recover_from_file(app: AppHandle, state: St<'_>) -> AppResult<()> {
     if state.lock().is_some() {
         return Err(AppError::Conflict("database_is_fine"));
     }
-    let source = picked(
+    let source = ask(&state, || {
         app.dialog()
             .file()
             .set_title("Выберите резервную копию")
             .add_filter("Резервная копия Family Budget", &[EXTENSION, "db"])
-            .blocking_pick_file(),
-    )?;
+            .blocking_pick_file()
+    })?;
     backup::verify_file(&source)?;
     let db_path = state.db_path();
     let stamp = chrono::Local::now().format("%Y%m%d-%H%M%S");
@@ -111,7 +120,7 @@ pub async fn recover_from_file(app: AppHandle, state: St<'_>) -> AppResult<()> {
 
 #[tauri::command]
 pub async fn choose_backup_folder(app: AppHandle, state: St<'_>) -> AppResult<BackupStatus> {
-    let folder = picked(app.dialog().file().set_title("Папка для резервных копий").blocking_pick_folder())?;
+    let folder = ask(&state, || app.dialog().file().set_title("Папка для резервных копий").blocking_pick_folder())?;
     state.with_db(|db| settings::write(&db.conn, "backup_dir", &folder.display().to_string()))?;
     status(&state)
 }
@@ -142,14 +151,14 @@ pub async fn check_integrity(state: St<'_>) -> AppResult<IntegrityReport> {
 pub async fn export_workspace(app: AppHandle, state: St<'_>, workspace_id: String) -> AppResult<String> {
     let json = state.with_db(|db| export::workspace_json(&db.conn, &workspace_id))?;
     let stamp = chrono::Local::now().format("%Y-%m-%d");
-    let path = picked(
+    let path = ask(&state, || {
         app.dialog()
             .file()
             .set_title("Экспорт пространства")
             .set_file_name(format!("family-budget-{stamp}.json"))
             .add_filter("JSON", &["json"])
-            .blocking_save_file(),
-    )?;
+            .blocking_save_file()
+    })?;
     std::fs::write(&path, serde_json::to_vec_pretty(&json)?)?;
     Ok(path.file_name().map(|n| n.to_string_lossy().into_owned()).unwrap_or_default())
 }
@@ -163,14 +172,14 @@ pub async fn export_transactions_csv(
 ) -> AppResult<String> {
     let csv = state.with_db(|db| export::transactions_csv(&db.conn, &workspace_id, &filter))?;
     let stamp = chrono::Local::now().format("%Y-%m-%d");
-    let path = picked(
+    let path = ask(&state, || {
         app.dialog()
             .file()
             .set_title("Экспорт операций")
             .set_file_name(format!("operations-{stamp}.csv"))
             .add_filter("CSV", &["csv"])
-            .blocking_save_file(),
-    )?;
+            .blocking_save_file()
+    })?;
     std::fs::write(&path, csv)?;
     Ok(path.file_name().map(|n| n.to_string_lossy().into_owned()).unwrap_or_default())
 }

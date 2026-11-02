@@ -687,8 +687,14 @@ fn backup_and_restore_round_trip() {
     assert_eq!(accounts::get(&db.conn, &ws.id, &card.id).unwrap().balance, 600);
 
     let source = backup::resolve(&backups, &name).unwrap();
+    crate::app::settings::write(&db.conn, "backup_dir", &"D:/Backups").unwrap();
     let safety = backup::restore_from(&mut db, &source, &backups).unwrap();
     assert_eq!(accounts::get(&db.conn, &ws.id, &card.id).unwrap().balance, 1_000);
+    // device settings are not rolled back with the data
+    let folder: Option<String> = crate::app::settings::read(&db.conn, "backup_dir").unwrap();
+    assert_eq!(folder.as_deref(), Some("D:/Backups"));
+    let last: Option<i64> = crate::app::settings::read(&db.conn, "last_backup_at").unwrap();
+    assert!(last.is_some());
     // the state before the restore is kept and can be restored back
     let safety_path = backup::resolve(&backups, &safety).unwrap();
     assert_eq!(backup::verify_file(&safety_path).unwrap().transactions, 1);
