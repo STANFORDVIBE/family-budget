@@ -27,6 +27,7 @@ export function WorkspaceSwitcher() {
   const current = useWorkspace();
   const workspaces = useApp((s) => s.workspaces);
   const [creating, setCreating] = useState(false);
+  const [menuOpen, setMenuOpen] = useState(false);
 
   async function select(id: string) {
     if (id === current.id) return;
@@ -41,11 +42,15 @@ export function WorkspaceSwitcher() {
   const Icon = current.kind === "family" ? Users : User;
   return (
     <>
-      <DropdownMenu>
+      <DropdownMenu open={menuOpen} onOpenChange={setMenuOpen}>
         <DropdownMenuTrigger asChild>
           <button
             type="button"
             data-testid="workspace-switcher"
+            // Open on click, not on pointer down: right after a hotkey the pointer-down opening was
+            // dismissed by the same event as an "outside" press, and the menu never showed
+            onPointerDown={(e) => e.button === 0 && e.preventDefault()}
+            onClick={() => setMenuOpen((open) => !open)}
             className="flex w-full items-center gap-2.5 rounded-lg bg-sidebar-accent/60 px-2.5 py-2 text-left outline-none hover:bg-sidebar-accent focus-visible:ring-2 focus-visible:ring-sidebar-ring"
           >
             <span className="flex size-8 shrink-0 items-center justify-center rounded-md bg-primary text-primary-foreground">
