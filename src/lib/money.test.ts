@@ -65,5 +65,7 @@ describe("formatPercent", () => {
     expect(formatPercent(8250)).toBe("82,5 %");
     expect(formatPercent(10000)).toBe("100 %");
     expect(formatPercent(3333)).toBe("33,3 %");
+    expect(formatPercent(1667)).toBe("16,7 %");
+    expect(formatPercent(-40)).toBe("-0,4 %");
   });
 });

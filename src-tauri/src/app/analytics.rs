@@ -15,6 +15,7 @@ use super::rates;
 use super::recurring::{self, Upcoming};
 use super::transactions::{self, Transaction, TransactionFilter};
 use super::{currency_decimals, workspace_base};
+use crate::domain::budget::PACE_DAYS;
 use crate::domain::dates::{
     Date, add_days, days_inclusive, format_date, format_month, month_end, month_start, parse_date, prev_month, today,
 };
@@ -451,8 +452,6 @@ pub fn dashboard(conn: &Connection, workspace_id: &str, from: &str, to: &str) ->
 /// Balance expected on the last day of this month: today's balance, plus scheduled income and
 /// minus scheduled payments still due this month (pending and upcoming), minus everyday spending
 /// continuing at this month's pace (spending not created by recurring rules).
-const PACE_DAYS: i64 = 30;
-
 fn forecast_end_of_month(
     conn: &Connection,
     workspace_id: &str,

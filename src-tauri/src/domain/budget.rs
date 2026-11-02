@@ -2,7 +2,7 @@
 
 use serde::Serialize;
 
-use super::dates::{Date, days_in_month, month_end, month_start};
+use super::dates::{Date, month_end, month_start};
 use super::money;
 
 /// Share of a limit at which the user gets a warning, in basis points (80 %).
@@ -28,15 +28,20 @@ pub fn limit_status(spent: i64, limit: i64) -> LimitStatus {
     }
 }
 
-/// Expected spending by the end of `month` if the current pace continues.
-/// Past months return what was actually spent; future months return the spent amount as is.
-pub fn forecast_month(spent: i64, month: Date, today: Date) -> i64 {
+/// Days of history that define the everyday spending pace.
+pub const PACE_DAYS: i64 = 30;
+
+/// Expected spending by the end of `month`: what is spent so far plus the remaining days at the
+/// pace of the last 30 days (`recent` = spending over those days). The month-to-date pace would
+/// turn one purchase on the 2nd into a whole month of such purchases.
+/// Past and future months return the spent amount as is.
+pub fn forecast_month(spent: i64, recent: i64, month: Date, today: Date) -> i64 {
     let start = month_start(month);
-    if today < start || today > month_end(month) {
+    let end = month_end(month);
+    if today < start || today > end {
         return spent;
     }
-    let elapsed = (today - start).num_days() + 1;
-    money::scale(spent, days_in_month(month), elapsed)
+    spent + money::scale(recent.max(0), (end - today).num_days(), PACE_DAYS)
 }
 
 #[cfg(test)]
@@ -60,10 +65,12 @@ mod tests {
     }
 
     #[test]
-    fn forecast_follows_current_pace() {
-        // 100 spent in the first 10 days of a 30-day month → 300
-        assert_eq!(forecast_month(10_000, d("2025-06-01"), d("2025-06-10")), 30_000);
-        assert_eq!(forecast_month(10_000, d("2025-06-01"), d("2025-07-02")), 10_000);
-        assert_eq!(forecast_month(0, d("2025-06-01"), d("2025-06-10")), 0);
+    fn forecast_follows_the_30_day_pace() {
+        // 300 over the last 30 days = 10 a day; 20 days left after June 10 → 100 spent + 200
+        assert_eq!(forecast_month(10_000, 30_000, d("2025-06-01"), d("2025-06-10")), 30_000);
+        // One big purchase on the 2nd is not multiplied by 15
+        assert_eq!(forecast_month(10_000, 10_000, d("2025-06-01"), d("2025-06-02")), 19_333);
+        assert_eq!(forecast_month(10_000, 30_000, d("2025-06-01"), d("2025-07-02")), 10_000);
+        assert_eq!(forecast_month(0, 0, d("2025-06-01"), d("2025-06-10")), 0);
     }
 }

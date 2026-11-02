@@ -7,8 +7,8 @@ use serde::{Deserialize, Serialize};
 
 use super::analytics::spending_by_category;
 use super::{Change, Table, ensure_in_workspace, new_id, now_millis, record_change, workspace_base};
-use crate::domain::budget::{LimitStatus, forecast_month, limit_status};
-use crate::domain::dates::{format_date, format_month, month_end, parse_month, prev_month, today};
+use crate::domain::budget::{LimitStatus, PACE_DAYS, forecast_month, limit_status};
+use crate::domain::dates::{add_days, format_date, format_month, month_end, parse_month, prev_month, today};
 use crate::domain::money;
 use crate::error::{AppError, AppResult};
 
@@ -102,6 +102,12 @@ pub fn get(conn: &Connection, workspace_id: &str, month: &str) -> AppResult<Budg
         .collect::<Result<_, _>>()?;
 
     let today = today();
+    // Spending of the last 30 days sets the pace of the forecast (only the current month needs it)
+    let recent = if today >= start && today <= month_end(start) {
+        spending_by_category(conn, workspace_id, &format_date(add_days(today, -(PACE_DAYS - 1))), &format_date(today))?
+    } else {
+        HashMap::new()
+    };
     let budget = budget_id(conn, workspace_id, &month)?;
     let mut limits = Vec::new();
     let mut covered = 0_i64;
@@ -117,14 +123,18 @@ pub fn get(conn: &Connection, workspace_id: &str, month: &str) -> AppResult<Budg
             .collect::<Result<_, _>>()?;
         let limited: Vec<&String> = rows.iter().map(|(_, c, _)| c).collect();
         for (limit_id, category_id, limit) in &rows {
-            let spent = money::sum(spending.iter().filter_map(|(cat, value)| {
-                let cat = cat.as_ref()?;
-                let own = cat == category_id;
-                // A child counts towards its parent's limit unless it has a limit of its own.
-                let via_parent =
-                    parents.get(cat).and_then(|p| p.as_ref()) == Some(category_id) && !limited.contains(&cat);
-                (own || via_parent).then_some(*value)
-            }))?;
+            let of_limit = |map: &HashMap<Option<String>, i64>| {
+                money::sum(map.iter().filter_map(|(cat, value)| {
+                    let cat = cat.as_ref()?;
+                    let own = cat == category_id;
+                    // A child counts towards its parent's limit unless it has a limit of its own.
+                    let via_parent =
+                        parents.get(cat).and_then(|p| p.as_ref()) == Some(category_id) && !limited.contains(&cat);
+                    (own || via_parent).then_some(*value)
+                }))
+            };
+            let spent = of_limit(&spending)?;
+            let recent_spent = of_limit(&recent)?;
             covered += spent;
             limits.push(LimitView {
                 id: limit_id.clone(),
@@ -134,7 +144,7 @@ pub fn get(conn: &Connection, workspace_id: &str, month: &str) -> AppResult<Budg
                 remaining: limit - spent,
                 percent_bp: money::basis_points(spent, *limit),
                 status: limit_status(spent, *limit),
-                forecast: forecast_month(spent, start, today),
+                forecast: forecast_month(spent, recent_spent, start, today),
             });
         }
     }
@@ -148,7 +158,7 @@ pub fn get(conn: &Connection, workspace_id: &str, month: &str) -> AppResult<Budg
         total_remaining: total_limit.map(|l| l - total_spent),
         total_percent_bp: total_limit.map(|l| money::basis_points(total_spent, l)),
         total_status: total_limit.map(|l| limit_status(total_spent, l)),
-        total_forecast: forecast_month(total_spent, start, today),
+        total_forecast: forecast_month(total_spent, money::sum(recent.values().copied())?, start, today),
         limits,
         unbudgeted_spent: total_spent - covered,
     })

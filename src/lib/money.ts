@@ -89,7 +89,9 @@ export function parseMoney(text: string, decimals: number, allowNegative = false
 
 /** Basis points (8250) → "82,5 %". */
 export function formatPercent(bp: number): string {
-  const whole = Math.trunc(bp / 100);
-  const frac = Math.abs(Math.trunc((bp % 100) / 10));
-  return `${whole}${frac ? "," + frac : ""} %`;
+  // Round to tenths of a percent: 1667 bp → 16,7 %
+  const tenths = Math.round(bp / 10);
+  const whole = Math.trunc(tenths / 10);
+  const frac = Math.abs(tenths % 10);
+  return `${tenths < 0 && whole === 0 ? "-" : ""}${whole}${frac ? "," + frac : ""} %`;
 }
