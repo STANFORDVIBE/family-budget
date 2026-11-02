@@ -4,7 +4,6 @@
 
 use std::collections::{BTreeMap, HashMap};
 
-use chrono::Datelike;
 use rusqlite::types::Value;
 use rusqlite::{Connection, params_from_iter};
 use serde::{Deserialize, Serialize};
@@ -452,6 +451,8 @@ pub fn dashboard(conn: &Connection, workspace_id: &str, from: &str, to: &str) ->
 /// Balance expected on the last day of this month: today's balance, plus scheduled income and
 /// minus scheduled payments still due this month (pending and upcoming), minus everyday spending
 /// continuing at this month's pace (spending not created by recurring rules).
+const PACE_DAYS: i64 = 30;
+
 fn forecast_end_of_month(
     conn: &Connection,
     workspace_id: &str,
@@ -478,18 +479,23 @@ fn forecast_end_of_month(
         }
     }
 
+    // Everyday pace = non-recurring spending of the last 30 days / 30. Month-to-date pace would
+    // turn one purchase on the 2nd into a whole month of such purchases.
     let (sql, args) = where_clause(
         workspace_id,
-        &AnalyticsFilter { from: format_date(month_start(today)), to: format_date(today), ..Default::default() },
+        &AnalyticsFilter {
+            from: format_date(add_days(today, -(PACE_DAYS - 1))),
+            to: format_date(today),
+            ..Default::default()
+        },
     )?;
     let everyday: i64 = conn.query_row(
         &format!("SELECT COALESCE(SUM({EXPENSE_EXPR}), 0){FROM}{sql} AND t.recurring_rule_id IS NULL"),
         params_from_iter(args.iter()),
         |r| r.get(0),
     )?;
-    let elapsed = i64::from(today.day());
     let remaining_days = (end - today).num_days();
-    forecast -= money::scale(everyday.max(0), remaining_days, elapsed);
+    forecast -= money::scale(everyday.max(0), remaining_days, PACE_DAYS);
     Ok(forecast)
 }
 

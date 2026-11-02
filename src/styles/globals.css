@@ -1,0 +1,232 @@
+@import "tailwindcss";
+@import "tw-animate-css";
+@import "shadcn/tailwind.css";
+@import "@fontsource-variable/inter";
+
+@custom-variant dark (&:is(.dark *));
+
+/*
+ * Family Budget design tokens: calm neutral surfaces with a teal accent.
+ * Light values live on :root, dark values on .dark. shadcn names are kept so components work
+ * as-is; note that shadcn's `accent` is the neutral hover surface, our teal is `primary` / `brand`.
+ * `income` and `expense` colour money: soft green and soft red, never alarming.
+ */
+:root {
+  --background: #f4f6f6;
+  --foreground: #142022;
+  --card: #ffffff;
+  --card-foreground: #142022;
+  --popover: #ffffff;
+  --popover-foreground: #142022;
+  --primary: #0f7c74;
+  --primary-foreground: #ffffff;
+  --secondary: #e7eced;
+  --secondary-foreground: #142022;
+  --muted: #ecf0f0;
+  --muted-foreground: #5a686b;
+  --accent: #e4eaea;
+  --accent-foreground: #142022;
+  --destructive: #c4504f;
+  --success: #2e8a57;
+  --warning: #b7791f;
+  --income: #2e8a57;
+  --expense: #c4504f;
+  --brand: #0f7c74;
+  --border: #dbe2e3;
+  --input: #cfd8d9;
+  --ring: #0f7c74;
+  --surface: #ffffff;
+  --elevated: #ffffff;
+  --hover: #e4eaea;
+  --sidebar: #eaefef;
+  --sidebar-foreground: #142022;
+  --sidebar-primary: #0f7c74;
+  --sidebar-primary-foreground: #ffffff;
+  --sidebar-accent: #dde5e5;
+  --sidebar-accent-foreground: #142022;
+  --sidebar-border: #dbe2e3;
+  --sidebar-ring: #0f7c74;
+  /* Validated categorical order (see the dataviz palette): blue, orange, aqua, yellow, magenta */
+  --chart-1: #2a78d6;
+  --chart-2: #eb6834;
+  --chart-3: #1baf7a;
+  --chart-4: #eda100;
+  --chart-5: #e87ba4;
+
+  --radius: 10px;
+  color-scheme: light;
+}
+
+.dark {
+  --background: #121718;
+  --foreground: #e9eff0;
+  --card: #1a2123;
+  --card-foreground: #e9eff0;
+  --popover: #242c2e;
+  --popover-foreground: #e9eff0;
+  --primary: #3dbdb1;
+  --primary-foreground: #0d1415;
+  --secondary: #252e30;
+  --secondary-foreground: #e9eff0;
+  --muted: #222a2c;
+  --muted-foreground: #93a2a5;
+  --accent: #222a2c;
+  --accent-foreground: #e9eff0;
+  --destructive: #e07f7c;
+  --success: #6cc493;
+  --warning: #e0aa55;
+  --income: #6cc493;
+  --expense: #e58985;
+  --brand: #3dbdb1;
+  --border: #2b3436;
+  --input: #2f393b;
+  --ring: #3dbdb1;
+  --surface: #1a2123;
+  --elevated: #242c2e;
+  --hover: #222a2c;
+  --sidebar: #161c1d;
+  --sidebar-foreground: #e9eff0;
+  --sidebar-primary: #3dbdb1;
+  --sidebar-primary-foreground: #0d1415;
+  --sidebar-accent: #222a2c;
+  --sidebar-accent-foreground: #e9eff0;
+  --sidebar-border: #232b2d;
+  --sidebar-ring: #3dbdb1;
+  --chart-1: #3987e5;
+  --chart-2: #d95926;
+  --chart-3: #199e70;
+  --chart-4: #c98500;
+  --chart-5: #d55181;
+
+  color-scheme: dark;
+}
+
+@theme inline {
+  --font-sans: "Inter Variable", "Segoe UI Variable Text", "Segoe UI", system-ui, sans-serif;
+  --font-heading: var(--font-sans);
+
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-success: var(--success);
+  --color-warning: var(--warning);
+  --color-income: var(--income);
+  --color-expense: var(--expense);
+  --color-brand: var(--brand);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+  --color-surface: var(--surface);
+  --color-elevated: var(--elevated);
+  --color-hover: var(--hover);
+  --color-sidebar: var(--sidebar);
+  --color-sidebar-foreground: var(--sidebar-foreground);
+  --color-sidebar-primary: var(--sidebar-primary);
+  --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
+  --color-sidebar-accent: var(--sidebar-accent);
+  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
+  --color-sidebar-border: var(--sidebar-border);
+  --color-sidebar-ring: var(--sidebar-ring);
+  --color-chart-1: var(--chart-1);
+  --color-chart-2: var(--chart-2);
+  --color-chart-3: var(--chart-3);
+  --color-chart-4: var(--chart-4);
+  --color-chart-5: var(--chart-5);
+
+  --radius-sm: 6px;
+  --radius-md: 8px;
+  --radius-lg: var(--radius);
+  --radius-xl: 12px;
+  --radius-2xl: 16px;
+  --radius-3xl: 20px;
+  --radius-4xl: 26px;
+
+  --default-transition-duration: 150ms;
+}
+
+@layer base {
+  * {
+    @apply border-border outline-ring/50;
+  }
+  html,
+  body,
+  #root {
+    height: 100%;
+  }
+  html {
+    @apply font-sans;
+    font-size: 14px;
+  }
+  body {
+    @apply bg-background text-foreground antialiased;
+    margin: 0;
+    user-select: none;
+    font-feature-settings: "cv11", "tnum" 0;
+  }
+  input,
+  textarea,
+  [data-selectable] {
+    user-select: text;
+  }
+  h1,
+  h2,
+  h3,
+  h4 {
+    @apply font-heading font-semibold tracking-tight;
+  }
+  button:not(:disabled),
+  [role="button"]:not(:disabled) {
+    cursor: pointer;
+  }
+  ::selection {
+    background-color: color-mix(in oklab, var(--brand) 30%, transparent);
+  }
+  ::-webkit-scrollbar {
+    width: 10px;
+    height: 10px;
+  }
+  ::-webkit-scrollbar-thumb {
+    background-color: var(--border);
+    border: 3px solid transparent;
+    border-radius: 999px;
+    background-clip: content-box;
+  }
+  ::-webkit-scrollbar-thumb:hover {
+    background-color: var(--muted-foreground);
+  }
+  ::-webkit-scrollbar-track {
+    background: transparent;
+  }
+  .theme-switching *,
+  .theme-switching *::before,
+  .theme-switching *::after {
+    transition: none !important;
+  }
+  @media (prefers-reduced-motion: reduce) {
+    *,
+    *::before,
+    *::after {
+      animation-duration: 1ms !important;
+      transition-duration: 1ms !important;
+    }
+  }
+}
+
+@layer utilities {
+  /* Money and counters: digits of equal width so columns line up */
+  .tabular {
+    font-variant-numeric: tabular-nums;
+  }
+}

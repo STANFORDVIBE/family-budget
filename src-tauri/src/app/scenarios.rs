@@ -748,3 +748,18 @@ fn csv_export_contains_operations() {
     let json = export::workspace_json(&f.db.conn, &ws).unwrap();
     assert_eq!(json["data"]["transactions"].as_array().unwrap().len(), 1);
 }
+
+#[test]
+fn month_end_forecast_uses_the_30_day_pace() {
+    let mut f = fixture();
+    let ws = f.personal.id.clone();
+    let card = f.account(&ws, "Карта", "EUR", 100_000);
+    let food = f.category(&ws, "Продукты");
+    let today = crate::domain::dates::today();
+    transactions::create(&mut f.db.conn, &ws, &expense(&card.id, 30_000, &food, &format_date(today))).unwrap();
+    let day = format_date(today);
+    let d = analytics::dashboard(&f.db.conn, &ws, &day, &day).unwrap();
+    // 300.00 over 30 days = 10.00 a day, for every day left in the month
+    let left = (crate::domain::dates::month_end(today) - today).num_days();
+    assert_eq!(d.forecast_end_of_month, 70_000 - 1_000 * left);
+}

@@ -21,6 +21,7 @@ export default tseslint.config(
       ...reactHooks.configs.recommended.rules,
       "react-refresh/only-export-components": ["warn", { allowConstantExport: true }],
       "@typescript-eslint/no-explicit-any": "error",
+      "@typescript-eslint/no-unused-vars": ["error", { argsIgnorePattern: "^_" }],
       // Money must never pass through float math in the UI: parseFloat/toFixed round silently
       "no-restricted-globals": ["error", { name: "parseFloat", message: "Use parseMoney() from @/lib/money." }],
       "no-restricted-properties": [
@@ -34,5 +35,11 @@ export default tseslint.config(
     // shadcn/ui components export their cva variants next to the component by design
     files: ["src/components/ui/**/*.tsx"],
     rules: { "react-refresh/only-export-components": "off" },
+  },
+  {
+    // Playwright fixtures: `use` is not a React hook and `{}` is the required empty fixture pattern
+    files: ["e2e/**/*.ts"],
+    languageOptions: { globals: globals.node },
+    rules: { "react-hooks/rules-of-hooks": "off", "no-empty-pattern": "off" },
   },
 );
