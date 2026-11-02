@@ -304,9 +304,11 @@ pub fn analytics(conn: &Connection, workspace_id: &str, filter: &AnalyticsFilter
     let from = parse_date(&filter.from, "from")?;
     let to = parse_date(&filter.to, "to")?;
     let mut missing_rates = Vec::new();
+    // History and the month comparison stop at today: future months have nothing to show yet
+    let history_to = to.min(today()).max(from);
 
     let mut balance_history = Vec::new();
-    for date in month_ends(from, to) {
+    for date in month_ends(from, history_to) {
         let (balance, _, missing) = balance_on(conn, workspace_id, &format_date(date), filter.account_id.as_deref())?;
         balance_history.push(BalancePoint { label: format_month(date), balance, incomplete: !missing.is_empty() });
         for m in missing {
@@ -325,7 +327,7 @@ pub fn analytics(conn: &Connection, workspace_id: &str, filter: &AnalyticsFilter
         .query_map(rusqlite::params![workspace_id, format_date(to)], |r| Ok((r.get(0)?, r.get(1)?, r.get(2)?)))?
         .collect::<Result<_, _>>()?;
     let mut savings_history = Vec::new();
-    for date in month_ends(from, to) {
+    for date in month_ends(from, history_to) {
         let day = format_date(date);
         let mut per_currency: BTreeMap<&str, i64> = BTreeMap::new();
         for (on, currency, amount) in &contributions {
@@ -344,8 +346,8 @@ pub fn analytics(conn: &Connection, workspace_id: &str, filter: &AnalyticsFilter
         savings_history.push(BalancePoint { label: format_month(date), balance: total, incomplete });
     }
 
-    // Month-to-month comparison: the last month of the period against the one before it.
-    let current_month = month_start(to);
+    // Month-to-month comparison: the last elapsed month of the period against the one before it.
+    let current_month = month_start(history_to);
     let previous_month = prev_month(current_month);
     let current = by_top_category(
         conn,

@@ -281,7 +281,15 @@ export function BalanceChart({
           {data.map(
             (d, i) =>
               i % every === 0 && (
-                <text key={d.label} x={x(i)} y={height - 6} textAnchor="middle" fontSize={11} fill="var(--muted-foreground)">
+                <text
+                  key={d.label}
+                  x={x(i)}
+                  y={height - 6}
+                  // Edge labels sit on the plot edges: anchor them inwards so they are not clipped
+                  textAnchor={data.length < 2 ? "middle" : i === 0 ? "start" : i === data.length - 1 ? "end" : "middle"}
+                  fontSize={11}
+                  fill="var(--muted-foreground)"
+                >
                   {tickLabel(d.label)}
                 </text>
               ),

@@ -407,7 +407,7 @@ export const ru = {
     balance: "Динамика баланса",
     savings: "История накоплений",
     comparison: "Сравнение месяцев",
-    comparisonHint: "{current} против {previous}",
+    comparisonHint: "{previous} → {current}",
     current: "Этот месяц",
     previous: "Прошлый месяц",
     allCurrencies: "Все валюты",
