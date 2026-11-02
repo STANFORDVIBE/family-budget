@@ -195,6 +195,7 @@ export const ru = {
     empty: "Операций не найдено",
     emptyHint: "Измените фильтры или добавьте операцию.",
     deletedToast: "Операция удалена",
+    restoredToast: "Операция восстановлена",
     found: "Найдено: {n}",
     loadMore: "Показать ещё",
     pendingBadge: "ожидает",

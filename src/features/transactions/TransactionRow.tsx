@@ -40,7 +40,7 @@ export function TransactionRow({
   const pending = tx.status === "pending";
 
   const restore = useWsMutation((workspaceId, id: string) => api.restoreTransaction({ workspaceId, id }), {
-    success: L.common.saved,
+    success: L.transactions.restoredToast,
   });
   const remove = useWsMutation((workspaceId, id: string) => api.deleteTransaction({ workspaceId, id }), {
     onSuccess: () =>

@@ -15,6 +15,7 @@ import { type Period, dayLabel, periodFor } from "@/lib/dates";
 import { toLookups } from "@/lib/lookups";
 import { useAccounts, useCategories, useMembers, useTransactions, useWsMutation } from "@/lib/queries";
 import type { Transaction, TransactionFilter, TxKind } from "@/lib/types";
+import { cn } from "@/lib/utils";
 import { useApp, useWorkspace } from "@/store/app";
 
 const PAGE = 100;
@@ -97,7 +98,10 @@ export function TransactionsPage() {
     setStatus("all");
   }
 
-  const groups = useMemo(() => groupByDate(data?.items ?? [], sort), [data, sort]);
+  const groups = useMemo(
+    () => groupByDate(data?.items ?? [], sort, workspace.baseCurrency),
+    [data, sort, workspace.baseCurrency],
+  );
 
   const kindOptions = [
     { value: "all" as const, label: L.transactions.allKinds },
@@ -137,7 +141,7 @@ export function TransactionsPage() {
               />
             </div>
           </div>
-          <div className="grid grid-cols-2 gap-2 lg:grid-cols-6">
+          <div className={cn("grid grid-cols-2 gap-2", workspace.kind === "family" ? "lg:grid-cols-6" : "lg:grid-cols-5")}>
             <SimpleSelect aria-label={L.transactions.allKinds} value={kind} options={kindOptions} onChange={setKind} />
             <AccountSelect
               accounts={accounts}
@@ -154,9 +158,7 @@ export function TransactionsPage() {
             />
             {workspace.kind === "family" ? (
               <MemberSelect members={members} value={memberId} onChange={setMemberId} allowNone={L.transactions.allMembers} />
-            ) : (
-              <div className="hidden lg:block" />
-            )}
+            ) : null}
             <SimpleSelect
               aria-label={L.common.status}
               value={status}
@@ -239,7 +241,7 @@ interface Group {
   items: Transaction[];
 }
 
-function groupByDate(items: Transaction[], sort: SortFilter): Group[] {
+function groupByDate(items: Transaction[], sort: SortFilter, baseCurrency: string): Group[] {
   if (sort === "amount_desc" || sort === "amount_asc") return items.length ? [{ key: "all", date: null, net: null, items }] : [];
   const groups: Group[] = [];
   for (const tx of items) {
@@ -249,8 +251,12 @@ function groupByDate(items: Transaction[], sort: SortFilter): Group[] {
       groups.push(group);
     }
     group.items.push(tx);
-    if (tx.status === "posted" && tx.kind !== "transfer" && tx.kind !== "adjustment") {
-      group.net = tx.baseAmount === null || group.net === null ? null : group.net + tx.baseAmount;
+    if (tx.status !== "posted" || group.net === null) continue;
+    if (tx.kind === "transfer") {
+      // Only the fee is spending; it is known in the base currency when the account is in it
+      if (tx.fee > 0) group.net = tx.currency === baseCurrency ? group.net - tx.fee : null;
+    } else if (tx.kind !== "adjustment") {
+      group.net = tx.baseAmount === null ? null : group.net + tx.baseAmount;
     }
   }
   return groups;
