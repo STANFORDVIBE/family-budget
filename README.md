@@ -16,9 +16,13 @@
 
 ## Запуск
 
-Установщик: `src-tauri/target/release/bundle/nsis/Family Budget_0.5.0_x64-setup.exe` — ставится для текущего
-пользователя, права администратора не нужны. Данные: `%APPDATA%\com.familybudget.app\`.
+Скачать установщик `Family.Budget_<версия>_x64-setup.exe` из [последнего релиза](../../releases/latest) и запустить —
+ставится для текущего пользователя, права администратора не нужны. Данные: `%APPDATA%\com.familybudget.app\`.
 Как собрать из исходников — [DEVELOPMENT.md](DEVELOPMENT.md).
 
 Документация: [резервные копии](docs/BACKUP.md) · [ARCHITECTURE.md](ARCHITECTURE.md) · [DATABASE.md](DATABASE.md) ·
 [CHANGELOG.md](CHANGELOG.md) · [отчёт о тестах](docs/TEST-REPORT.md) · [ТЗ](docs/SPEC.md)
+
+## Лицензия
+
+[MIT](LICENSE)
