@@ -74,26 +74,53 @@ test("a third workspace can be created from the switcher", async ({ app }) => {
   await expect(page.getByRole("button", { name: "Участники семьи" })).toBeVisible();
 });
 
-test("a workspace can be deleted, but not the last one", async ({ app }) => {
+test("a workspace can be deleted by right click or in settings, but not the last one", async ({ app }) => {
   const page = app.page;
   await onboard(page);
-  await page.getByTestId("workspace-switcher").click();
-  await page.getByRole("menuitem", { name: "Новое пространство" }).click();
-  await page.getByLabel("Название").fill("Дача");
-  await page.getByRole("dialog").getByRole("button", { name: "Добавить" }).click();
-  await expect(page.getByTestId("workspace-switcher")).toContainText("Дача");
+  for (const name of ["Дача", "Гараж"]) {
+    await page.getByTestId("workspace-switcher").click();
+    await page.getByRole("menuitem", { name: "Новое пространство" }).click();
+    await page.getByLabel("Название").fill(name);
+    await page.getByRole("dialog").getByRole("button", { name: "Добавить" }).click();
+    await expect(page.getByTestId("workspace-switcher")).toContainText(name);
+  }
 
-  await page.getByRole("button", { name: "Настройки" }).click();
-  await page.getByRole("button", { name: "Удалить пространство" }).click();
+  // right click on another workspace in the list: the active one stays
+  await page.getByTestId("workspace-switcher").click();
+  await page.getByRole("menuitem", { name: "Дача" }).click({ button: "right" });
+  await expect(page.getByRole("dialog")).toContainText("Удалить «Дача»?");
   await page.getByRole("dialog").getByRole("button", { name: "Удалить" }).click();
   await expect(page.getByText("Пространство удалено")).toBeVisible();
+  await expect(page.getByTestId("workspace-switcher")).toContainText("Гараж");
+
+  // right click on the active one: another opens
+  await page.getByTestId("workspace-switcher").click({ button: "right" });
+  await page.getByRole("dialog").getByRole("button", { name: "Удалить" }).click();
   await expect(page.getByTestId("workspace-switcher")).toContainText("Личный бюджет");
   await page.getByTestId("workspace-switcher").click();
   await expect(page.getByRole("menuitem", { name: "Дача" })).toHaveCount(0);
+  await expect(page.getByRole("menuitem", { name: "Гараж" })).toHaveCount(0);
   await page.keyboard.press("Escape");
 
-  // the only one left cannot be deleted, and a safety copy was saved
+  // the only one left cannot be deleted, and the safety copies were saved
+  await page.getByTestId("workspace-switcher").click({ button: "right" });
+  await expect(page.getByRole("dialog")).toHaveCount(0);
+  await page.getByRole("button", { name: "Настройки" }).click();
   await expect(page.getByRole("button", { name: "Удалить пространство" })).toHaveCount(0);
-  await expect(page.getByText(/before-delete-/).first()).toBeVisible();
+  await expect(page.getByText(/before-delete-/)).toHaveCount(2);
   await page.screenshot({ path: "test-results/07-workspace-deleted.png" });
+});
+
+test("the active workspace can also be deleted in settings", async ({ app }) => {
+  const page = app.page;
+  await onboard(page, { family: true });
+  await page.getByTestId("workspace-switcher").click();
+  await page.getByRole("menuitem", { name: "Семейный бюджет" }).click();
+  await page.getByRole("button", { name: "Настройки" }).click();
+  await page.getByRole("button", { name: "Удалить пространство" }).click();
+  await page.getByRole("dialog").getByRole("button", { name: "Удалить" }).click();
+  await expect(page.getByTestId("workspace-switcher")).toContainText("Личный бюджет");
+  // the choice survives a restart
+  const restarted = await app.restart();
+  await expect(restarted.getByTestId("workspace-switcher")).toContainText("Личный бюджет");
 });

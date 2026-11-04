@@ -19,6 +19,7 @@ import { useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 import { toast } from "sonner";
 import { ConfirmDialog } from "@/components/common/confirm-dialog";
+import { DeleteWorkspaceDialog } from "@/components/layout/WorkspaceSwitcher";
 import { Field, Page, PageHeader } from "@/components/common/layout";
 import { CurrencySelect, SimpleSelect } from "@/components/common/pickers";
 import { Badge } from "@/components/ui/badge";
@@ -46,7 +47,7 @@ export function SettingsPage({ onReload }: { onReload: () => Promise<void> }) {
     <Page className="max-w-4xl">
       <PageHeader title={L.settings.title} />
       <General />
-      <WorkspaceSettings onReload={onReload} />
+      <WorkspaceSettings />
       <Rates />
       <Backups onReload={onReload} />
       <Integrity />
@@ -184,25 +185,11 @@ function General() {
   );
 }
 
-function WorkspaceSettings({ onReload }: { onReload: () => Promise<void> }) {
+function WorkspaceSettings() {
   const L = useL();
   const workspace = useWorkspace();
   const canDelete = useApp((s) => s.workspaces.length > 1);
-  const [confirmDelete, setConfirmDelete] = useState(false);
   const [deleting, setDeleting] = useState(false);
-  // Not useAppMutation: refetching this workspace's queries after it is gone would only fail.
-  async function removeWorkspace() {
-    setDeleting(true);
-    try {
-      const backup = await api.deleteWorkspace({ workspaceId: workspace.id });
-      toast.success(fmt(L.settings.workspaceDeleted, { name: backup }));
-      // Reloading picks another workspace and remounts the screen
-      await onReload();
-    } catch (error) {
-      toast.error(errorMessage(error, L));
-      setDeleting(false);
-    }
-  }
   const [name, setName] = useState(workspace.name);
   const [currency, setCurrency] = useState(workspace.baseCurrency);
   const dirty = name.trim() !== workspace.name || currency !== workspace.baseCurrency;
@@ -236,21 +223,13 @@ function WorkspaceSettings({ onReload }: { onReload: () => Promise<void> }) {
       </div>
       {canDelete && (
         <div className="border-t pt-4">
-          <Button variant="outline" className="text-destructive" onClick={() => setConfirmDelete(true)}>
+          <Button variant="outline" className="text-destructive" onClick={() => setDeleting(true)}>
             <Trash2 />
             {L.settings.deleteWorkspace}
           </Button>
         </div>
       )}
-      <ConfirmDialog
-        open={confirmDelete}
-        onOpenChange={setConfirmDelete}
-        title={fmt(L.settings.deleteWorkspaceTitle, { name: workspace.name })}
-        text={L.settings.deleteWorkspaceText}
-        confirmLabel={L.common.delete}
-        pending={deleting}
-        onConfirm={() => void removeWorkspace()}
-      />
+      <DeleteWorkspaceDialog workspace={deleting ? workspace : null} onClose={() => setDeleting(false)} />
     </Section>
   );
 }

@@ -1,6 +1,7 @@
 import { Check, ChevronsUpDown, Plus, User, Users } from "lucide-react";
 import { useState } from "react";
 import { toast } from "sonner";
+import { ConfirmDialog } from "@/components/common/confirm-dialog";
 import { Field } from "@/components/common/layout";
 import { CurrencySelect } from "@/components/common/pickers";
 import { Button } from "@/components/ui/button";
@@ -15,28 +16,38 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { Input } from "@/components/ui/input";
 import { SegmentedControl } from "@/components/ui/segmented-control";
-import { useL } from "@/i18n";
+import { fmt, useL } from "@/i18n";
 import { api } from "@/lib/api";
 import { errorMessage } from "@/lib/errors";
-import type { WorkspaceKind } from "@/lib/types";
+import type { Workspace, WorkspaceKind } from "@/lib/types";
 import { useApp, useWorkspace } from "@/store/app";
 
-/** Switches between the personal and family budgets; their data never mix. */
+/** Makes a workspace the active one and remembers the choice for the next start. */
+async function activate(id: string) {
+  if (id === useApp.getState().workspaceId) return;
+  useApp.getState().setWorkspace(id);
+  try {
+    useApp.getState().setSettings(await api.updateSettings({ activeWorkspaceId: id }));
+  } catch {
+    // the switch itself already happened; remembering it is best effort
+  }
+}
+
+/** Switches between the personal and family budgets; their data never mix. Right click deletes one. */
 export function WorkspaceSwitcher() {
   const L = useL();
   const current = useWorkspace();
   const workspaces = useApp((s) => s.workspaces);
   const [creating, setCreating] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
+  const [deleting, setDeleting] = useState<Workspace | null>(null);
 
-  async function select(id: string) {
-    if (id === current.id) return;
-    useApp.getState().setWorkspace(id);
-    try {
-      useApp.getState().setSettings(await api.updateSettings({ activeWorkspaceId: id }));
-    } catch {
-      // the switch itself already happened; remembering it is best effort
-    }
+  function askDelete(event: React.MouseEvent, workspace: Workspace) {
+    event.preventDefault();
+    // the last workspace cannot be deleted
+    if (workspaces.length < 2) return;
+    setMenuOpen(false);
+    setDeleting(workspace);
   }
 
   const Icon = current.kind === "family" ? Users : User;
@@ -51,6 +62,7 @@ export function WorkspaceSwitcher() {
             // dismissed by the same event as an "outside" press, and the menu never showed
             onPointerDown={(e) => e.button === 0 && e.preventDefault()}
             onClick={() => setMenuOpen((open) => !open)}
+            onContextMenu={(e) => askDelete(e, current)}
             className="flex w-full items-center gap-2.5 rounded-lg bg-sidebar-accent/60 px-2.5 py-2 text-left outline-none hover:bg-sidebar-accent focus-visible:ring-2 focus-visible:ring-sidebar-ring"
           >
             <span className="flex size-8 shrink-0 items-center justify-center rounded-md bg-primary text-primary-foreground">
@@ -68,7 +80,7 @@ export function WorkspaceSwitcher() {
         <DropdownMenuContent className="w-64">
           <DropdownMenuLabel>{L.workspace.switchTitle}</DropdownMenuLabel>
           {workspaces.map((w) => (
-            <DropdownMenuItem key={w.id} onSelect={() => void select(w.id)}>
+            <DropdownMenuItem key={w.id} onSelect={() => void activate(w.id)} onContextMenu={(e) => askDelete(e, w)}>
               {w.kind === "family" ? <Users /> : <User />}
               <span className="flex-1 truncate">{w.name}</span>
               {w.id === current.id && <Check className="text-primary" />}
@@ -81,8 +93,46 @@ export function WorkspaceSwitcher() {
           </DropdownMenuItem>
         </DropdownMenuContent>
       </DropdownMenu>
-      <CreateWorkspaceDialog open={creating} onOpenChange={setCreating} onCreated={(id) => void select(id)} />
+      <CreateWorkspaceDialog open={creating} onOpenChange={setCreating} onCreated={(id) => void activate(id)} />
+      <DeleteWorkspaceDialog workspace={deleting} onClose={() => setDeleting(null)} />
     </>
+  );
+}
+
+/** Confirms and deletes a workspace (a backup is saved first). If it was the active one, another opens. */
+export function DeleteWorkspaceDialog({ workspace, onClose }: { workspace: Workspace | null; onClose: () => void }) {
+  const L = useL();
+  const [busy, setBusy] = useState(false);
+
+  async function confirm() {
+    if (!workspace || busy) return;
+    setBusy(true);
+    try {
+      const backup = await api.deleteWorkspace({ workspaceId: workspace.id });
+      const store = useApp.getState();
+      const left = store.workspaces.filter((w) => w.id !== workspace.id);
+      // switch first: the screens of the deleted workspace must not render without it
+      if (store.workspaceId === workspace.id && left[0]) await activate(left[0].id);
+      useApp.getState().setWorkspaces(left);
+      toast.success(fmt(L.settings.workspaceDeleted, { name: backup }));
+      onClose();
+    } catch (error) {
+      toast.error(errorMessage(error, L));
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <ConfirmDialog
+      open={workspace !== null}
+      onOpenChange={(open) => !open && onClose()}
+      title={fmt(L.settings.deleteWorkspaceTitle, { name: workspace?.name ?? "" })}
+      text={L.settings.deleteWorkspaceText}
+      confirmLabel={L.common.delete}
+      pending={busy}
+      onConfirm={() => void confirm()}
+    />
   );
 }
 
