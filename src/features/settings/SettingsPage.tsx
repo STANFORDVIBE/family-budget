@@ -46,7 +46,7 @@ export function SettingsPage({ onReload }: { onReload: () => Promise<void> }) {
     <Page className="max-w-4xl">
       <PageHeader title={L.settings.title} />
       <General />
-      <WorkspaceSettings />
+      <WorkspaceSettings onReload={onReload} />
       <Rates />
       <Backups onReload={onReload} />
       <Integrity />
@@ -184,9 +184,25 @@ function General() {
   );
 }
 
-function WorkspaceSettings() {
+function WorkspaceSettings({ onReload }: { onReload: () => Promise<void> }) {
   const L = useL();
   const workspace = useWorkspace();
+  const canDelete = useApp((s) => s.workspaces.length > 1);
+  const [confirmDelete, setConfirmDelete] = useState(false);
+  const [deleting, setDeleting] = useState(false);
+  // Not useAppMutation: refetching this workspace's queries after it is gone would only fail.
+  async function removeWorkspace() {
+    setDeleting(true);
+    try {
+      const backup = await api.deleteWorkspace({ workspaceId: workspace.id });
+      toast.success(fmt(L.settings.workspaceDeleted, { name: backup }));
+      // Reloading picks another workspace and remounts the screen
+      await onReload();
+    } catch (error) {
+      toast.error(errorMessage(error, L));
+      setDeleting(false);
+    }
+  }
   const [name, setName] = useState(workspace.name);
   const [currency, setCurrency] = useState(workspace.baseCurrency);
   const dirty = name.trim() !== workspace.name || currency !== workspace.baseCurrency;
@@ -218,6 +234,23 @@ function WorkspaceSettings() {
           {L.common.save}
         </Button>
       </div>
+      {canDelete && (
+        <div className="border-t pt-4">
+          <Button variant="outline" className="text-destructive" onClick={() => setConfirmDelete(true)}>
+            <Trash2 />
+            {L.settings.deleteWorkspace}
+          </Button>
+        </div>
+      )}
+      <ConfirmDialog
+        open={confirmDelete}
+        onOpenChange={setConfirmDelete}
+        title={fmt(L.settings.deleteWorkspaceTitle, { name: workspace.name })}
+        text={L.settings.deleteWorkspaceText}
+        confirmLabel={L.common.delete}
+        pending={deleting}
+        onConfirm={() => void removeWorkspace()}
+      />
     </Section>
   );
 }

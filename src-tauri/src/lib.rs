@@ -74,6 +74,7 @@ pub fn run() {
             commands::workspace::rename_user,
             commands::workspace::create_workspace,
             commands::workspace::update_workspace,
+            commands::workspace::delete_workspace,
             commands::workspace::list_members,
             commands::workspace::create_member,
             commands::workspace::update_member,

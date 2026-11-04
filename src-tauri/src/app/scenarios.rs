@@ -473,6 +473,27 @@ fn goal_contributions_are_not_expenses() {
 }
 
 #[test]
+fn deleted_workspace_disappears_but_the_last_one_stays() {
+    let mut f = fixture();
+    let family = f.family.id.clone();
+    let card = f.account(&family, "Карта", "EUR", 1_000);
+    let food = f.category(&family, "Продукты");
+    assert!(transactions::create(&mut f.db.conn, &family, &expense(&card.id, 100, &food, "2025-03-01")).is_ok());
+    settings::write(&f.db.conn, "active_workspace_id", &family).unwrap();
+    workspaces::delete(&mut f.db.conn, &family).unwrap();
+    let left = workspaces::list(&f.db.conn).unwrap();
+    assert_eq!(left.iter().map(|w| w.id.as_str()).collect::<Vec<_>>(), [f.personal.id.as_str()]);
+    // no new records go into it, and the app no longer opens it
+    assert!(transactions::create(&mut f.db.conn, &family, &expense(&card.id, 100, &food, "2025-03-02")).is_err());
+    assert_eq!(settings::get(&f.db.conn).unwrap().active_workspace_id, None);
+    assert!(matches!(
+        workspaces::delete(&mut f.db.conn, &f.personal.id.clone()),
+        Err(AppError::Conflict("last_workspace"))
+    ));
+    assert!(backup::integrity(&f.db.conn).unwrap().ok);
+}
+
+#[test]
 fn personal_and_family_data_are_isolated() {
     let mut f = fixture();
     let personal = f.personal.id.clone();

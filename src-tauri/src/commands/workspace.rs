@@ -1,6 +1,7 @@
 use serde::Serialize;
 
 use super::St;
+use crate::app::backup;
 use crate::app::members::{self, Member, MemberInput};
 use crate::app::settings::{self, FormMemory, Settings, SettingsUpdate};
 use crate::app::setup::{self, Currency, OnboardingInput, User};
@@ -61,6 +62,18 @@ pub async fn create_workspace(state: St<'_>, input: WorkspaceInput) -> AppResult
 #[tauri::command]
 pub async fn update_workspace(state: St<'_>, workspace_id: String, input: WorkspaceUpdate) -> AppResult<Workspace> {
     state.with_db(|db| workspaces::update(&mut db.conn, &workspace_id, &input))
+}
+
+/// Deletes a workspace after saving a backup it can be restored from. Returns the backup's name.
+#[tauri::command]
+pub async fn delete_workspace(state: St<'_>, workspace_id: String) -> AppResult<String> {
+    state.with_db(|db| {
+        workspaces::get(&db.conn, &workspace_id)?;
+        let dir = state.backup_dir(db)?;
+        let name = backup::named_backup(&db.conn, &dir, "before-delete-")?;
+        workspaces::delete(&mut db.conn, &workspace_id)?;
+        Ok(name)
+    })
 }
 
 #[tauri::command]

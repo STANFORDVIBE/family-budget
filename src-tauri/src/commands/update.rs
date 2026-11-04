@@ -41,7 +41,7 @@ pub async fn install_update(app: AppHandle, state: St<'_>) -> AppResult<()> {
     // The new version may migrate the database: keep a way back.
     state.with_db(|db| {
         let dir = state.backup_dir(db)?;
-        backup::before_update_backup(&db.conn, &dir)
+        backup::named_backup(&db.conn, &dir, "before-update-")
     })?;
     update.download_and_install(|_, _| {}, || {}).await.map_err(|_| AppError::UpdateFailed)?;
     app.restart();

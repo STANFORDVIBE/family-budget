@@ -53,6 +53,7 @@ export const api = {
     invoke<Workspace>("create_workspace", { input }),
   updateWorkspace: (workspaceId: string, input: { name: string; baseCurrency: string }) =>
     invoke<Workspace>("update_workspace", { workspaceId, input }),
+  deleteWorkspace: (a: Ws) => invoke<string>("delete_workspace", a),
   updateSettings: (input: Partial<Omit<Settings, "backupDir">>) => invoke<Settings>("update_settings", { input }),
   formMemory: (a: Ws) => invoke<FormMemory>("get_form_memory", a),
 

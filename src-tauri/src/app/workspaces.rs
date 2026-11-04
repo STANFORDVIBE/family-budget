@@ -1,7 +1,7 @@
 use rusqlite::{Connection, OptionalExtension, Row, params};
 use serde::{Deserialize, Serialize};
 
-use super::{Change, clean_required, current_user, new_id, now_millis, record_change};
+use super::{Change, clean_required, current_user, new_id, now_millis, record_change, settings};
 use crate::db::seed;
 use crate::domain::dates::{format_date, today};
 use crate::error::{AppError, AppResult};
@@ -157,4 +157,37 @@ pub fn update(conn: &mut Connection, id: &str, input: &WorkspaceUpdate) -> AppRe
     )?;
     tx.commit()?;
     Ok(new)
+}
+
+/// Hides a workspace with everything in it. Its rows stay in the database and in backups, so a
+/// restore brings it back. The last workspace cannot be deleted: the app needs one to work in.
+pub fn delete(conn: &mut Connection, id: &str) -> AppResult<()> {
+    let tx = conn.transaction()?;
+    let old = get(&tx, id)?;
+    let remaining: i64 = tx.query_row("SELECT COUNT(*) FROM workspaces WHERE deleted_at IS NULL", [], |r| r.get(0))?;
+    if remaining <= 1 {
+        return Err(AppError::Conflict("last_workspace"));
+    }
+    tx.execute(
+        "UPDATE workspaces SET deleted_at = ?1, updated_at = ?1, version = version + 1 WHERE id = ?2",
+        params![now_millis(), id],
+    )?;
+    let active: Option<String> = settings::read(&tx, "active_workspace_id")?;
+    if active.as_deref() == Some(id) {
+        tx.execute("DELETE FROM app_settings WHERE key = 'active_workspace_id'", [])?;
+    }
+    record_change(
+        &tx,
+        Change::<Workspace> {
+            workspace_id: Some(id),
+            entity: "workspace",
+            entity_id: id,
+            action: "delete",
+            version: old.version + 1,
+            old: Some(&old),
+            new: None,
+        },
+    )?;
+    tx.commit()?;
+    Ok(())
 }

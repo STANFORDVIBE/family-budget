@@ -183,12 +183,8 @@ pub fn manual_backup(conn: &Connection, dir: &Path) -> AppResult<String> {
     named_backup(conn, dir, "backup-")
 }
 
-/// Copy taken right before an app update installs, in case the new version misbehaves.
-pub fn before_update_backup(conn: &Connection, dir: &Path) -> AppResult<String> {
-    named_backup(conn, dir, "before-update-")
-}
-
-fn named_backup(conn: &Connection, dir: &Path, prefix: &str) -> AppResult<String> {
+/// Safety copy before a risky step (app update, deleting a workspace). Never pruned automatically.
+pub fn named_backup(conn: &Connection, dir: &Path, prefix: &str) -> AppResult<String> {
     let name = unique_name(dir, prefix);
     backup_to(conn, &dir.join(&name))?;
     settings::write(conn, "last_backup_at", &now_millis())?;
