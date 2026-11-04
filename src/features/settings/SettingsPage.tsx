@@ -1,11 +1,14 @@
 import {
+  CircleCheck,
   DatabaseBackup,
+  Download,
   FileDown,
   FolderOpen,
   HardDrive,
   Monitor,
   Moon,
   Plus,
+  RefreshCw,
   RotateCcw,
   ShieldCheck,
   Sun,
@@ -32,7 +35,7 @@ import { dayLabel, formatDate, todayIso } from "@/lib/dates";
 import { errorMessage, isCancelled } from "@/lib/errors";
 import { useAppMutation, useAudit, useBackupStatus, useRates, useWsMutation } from "@/lib/queries";
 import { displayRate, normalizeRate } from "@/lib/rates";
-import type { BackupFile, IntegrityReport, Settings } from "@/lib/types";
+import type { BackupFile, IntegrityReport, Settings, UpdateInfo } from "@/lib/types";
 import { useApp, useWorkspace } from "@/store/app";
 
 const dateTime = new Intl.DateTimeFormat("ru-RU", { dateStyle: "medium", timeStyle: "short" });
@@ -534,11 +537,38 @@ function Audit() {
 function About() {
   const L = useL();
   const version = useApp((s) => s.appVersion);
+  // undefined: not checked yet, null: already the latest version
+  const [found, setFound] = useState<UpdateInfo | null | undefined>(undefined);
+  const check = useAppMutation(() => api.checkUpdate(), { onSuccess: setFound });
+  // On success the app exits and the installer restarts it, so only errors come back here.
+  const install = useAppMutation(() => api.installUpdate());
   return (
     <Section title={L.settings.about}>
       <p className="text-sm">
         {L.app.name} · {fmt(L.settings.version, { v: version })}
       </p>
+      <div className="flex flex-wrap items-center gap-3">
+        <Button variant="outline" onClick={() => check.mutate(undefined)} disabled={check.isPending || install.isPending}>
+          <RefreshCw className={check.isPending ? "animate-spin" : undefined} />
+          {L.settings.checkUpdate}
+        </Button>
+        {found === null && (
+          <span className="flex items-center gap-1.5 text-sm text-success">
+            <CircleCheck className="size-4" />
+            {L.settings.upToDate}
+          </span>
+        )}
+        {found && (
+          <>
+            <span className="text-sm">{fmt(L.settings.updateAvailable, { v: found.version })}</span>
+            <Button onClick={() => install.mutate(undefined)} disabled={install.isPending}>
+              <Download />
+              {install.isPending ? L.settings.installingUpdate : L.settings.installUpdate}
+            </Button>
+          </>
+        )}
+      </div>
+      {found && <p className="text-xs text-muted-foreground">{L.settings.updateHint}</p>}
       <p className="text-sm text-muted-foreground">{L.settings.privacy}</p>
     </Section>
   );

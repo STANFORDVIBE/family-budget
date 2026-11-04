@@ -411,6 +411,13 @@ export interface BackupStatus {
   files: BackupFile[];
 }
 
+/** A newer release found on GitHub. */
+export interface UpdateInfo {
+  version: string;
+  currentVersion: string;
+  notes: string | null;
+}
+
 export interface IntegrityReport {
   ok: boolean;
   issues: [string, number][];

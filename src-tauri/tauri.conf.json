@@ -31,6 +31,15 @@
       "freezePrototype": true
     }
   },
+  "plugins": {
+    "updater": {
+      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IDM3OTQwNzJBNEQ5REM5MTUKUldRVnlaMU5LZ2VVTnp1S0VGK0RSSUl4aGR5U3l2ZTQwUGZFZ0VCMmNqUXdHTmloazZoVmlYUGIK",
+      "endpoints": ["https://github.com/STANFORDVIBE/family-budget/releases/latest/download/latest.json"],
+      "windows": {
+        "installMode": "passive"
+      }
+    }
+  },
   "bundle": {
     "active": true,
     "targets": ["nsis"],

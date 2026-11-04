@@ -6,6 +6,7 @@ pub mod data;
 pub mod finance;
 pub mod planning;
 pub mod reports;
+pub mod update;
 pub mod workspace;
 
 use tauri::State;

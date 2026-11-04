@@ -29,6 +29,7 @@ import type {
   TransactionFilter,
   TransactionInput,
   TransactionPage,
+  UpdateInfo,
   User,
   Workspace,
   WorkspaceKind,
@@ -125,4 +126,7 @@ export const api = {
   checkIntegrity: () => invoke<IntegrityReport>("check_integrity"),
   exportWorkspace: (a: Ws) => invoke<string>("export_workspace", a),
   exportTransactionsCsv: (a: Ws & { filter: TransactionFilter }) => invoke<string>("export_transactions_csv", a),
+
+  checkUpdate: () => invoke<UpdateInfo | null>("check_update"),
+  installUpdate: () => invoke<void>("install_update"),
 };

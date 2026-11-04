@@ -58,6 +58,7 @@ pub fn run() {
     builder
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_opener::init())
+        .plugin(tauri_plugin_updater::Builder::new().build())
         .setup(|app| {
             let data_dir = data_dir(app)?;
             app.manage(AppState::new(data_dir));
@@ -131,6 +132,8 @@ pub fn run() {
             commands::data::check_integrity,
             commands::data::export_workspace,
             commands::data::export_transactions_csv,
+            commands::update::check_update,
+            commands::update::install_update,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

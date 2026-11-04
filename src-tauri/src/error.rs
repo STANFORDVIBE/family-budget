@@ -28,6 +28,9 @@ pub enum AppError {
     Cancelled,
     #[error("amount is too large")]
     Overflow,
+    /// No internet, GitHub unavailable or the installer failed its signature check.
+    #[error("update failed")]
+    UpdateFailed,
     #[error("database error")]
     Database(#[source] rusqlite::Error),
     #[error("io error")]
@@ -49,6 +52,7 @@ impl AppError {
             AppError::Integrity => "integrity",
             AppError::Cancelled => "cancelled",
             AppError::Overflow => "overflow",
+            AppError::UpdateFailed => "update_failed",
             AppError::Database(_) => "database",
             AppError::Io(_) => "io",
             AppError::Internal => "internal",

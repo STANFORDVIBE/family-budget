@@ -36,6 +36,8 @@ export function errorMessage(error: unknown, L: Dictionary): string {
       return E.integrity;
     case "overflow":
       return E.overflow;
+    case "update_failed":
+      return E.update_failed;
     default:
       return E.generic;
   }
