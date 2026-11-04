@@ -538,6 +538,7 @@ fn rewrite(
     )?;
     write_entries(&tx, workspace_id, id, &prepared, now)?;
     let new = get(&tx, workspace_id, id)?;
+    sync_goal_contribution(&tx, workspace_id, &new, now)?;
     record_change(
         &tx,
         Change {
@@ -552,6 +553,48 @@ fn rewrite(
     )?;
     tx.commit()?;
     Ok(new)
+}
+
+/// A goal contribution backed by this transfer follows its edits: a deposit takes the amount that
+/// arrived, a withdrawal the amount that left. It must stay a transfer in the goal currency.
+fn sync_goal_contribution(conn: &Connection, workspace_id: &str, new: &Transaction, now: i64) -> AppResult<()> {
+    let linked: Option<(String, i64, String, i64)> = conn
+        .query_row(
+            "SELECT c.id, c.amount_minor, g.currency, c.version FROM goal_contributions c JOIN goals g ON g.id = c.goal_id
+             WHERE c.transaction_id = ?1 AND c.deleted_at IS NULL",
+            [&new.id],
+            |r| Ok((r.get(0)?, r.get(1)?, r.get(2)?, r.get(3)?)),
+        )
+        .optional()?;
+    let Some((contribution_id, old_amount, goal_currency, version)) = linked else {
+        return Ok(());
+    };
+    // For a transfer `amount` is the signed change of the source account, i.e. -from_amount.
+    let (amount, currency) = if old_amount > 0 {
+        (new.to_amount.unwrap_or(0), new.to_currency.as_deref())
+    } else {
+        (new.amount, Some(new.currency.as_str()))
+    };
+    if new.kind != "transfer" || currency != Some(goal_currency.as_str()) || amount == 0 {
+        return Err(AppError::Conflict("goal_transfer"));
+    }
+    conn.execute(
+        "UPDATE goal_contributions SET amount_minor = ?1, contributed_on = ?2, updated_at = ?3, version = version + 1
+         WHERE id = ?4",
+        params![amount, new.date, now, contribution_id],
+    )?;
+    record_change(
+        conn,
+        Change {
+            workspace_id: Some(workspace_id),
+            entity: "goal_contribution",
+            entity_id: &contribution_id,
+            action: "update",
+            version: version + 1,
+            old: Some(&serde_json::json!({ "amount": old_amount })),
+            new: Some(&serde_json::json!({ "amount": amount, "date": new.date })),
+        },
+    )
 }
 
 pub fn update(conn: &mut Connection, workspace_id: &str, id: &str, input: &TransactionInput) -> AppResult<Transaction> {

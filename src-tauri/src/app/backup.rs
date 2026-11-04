@@ -104,14 +104,16 @@ pub fn verify_file(path: &Path) -> AppResult<BackupInfo> {
 pub fn restore_from(db: &mut Database, source: &Path, backup_dir: &Path) -> AppResult<String> {
     verify_file(source)?;
     let safety_name = unique_name(backup_dir, "before-restore-");
-    backup_to(&db.conn, &backup_dir.join(&safety_name))?;
+    let safety_path = backup_dir.join(&safety_name);
+    backup_to(&db.conn, &safety_path)?;
     // The backup folder belongs to this computer, not to the data: it survives the restore
     let folder: Option<String> = settings::read(&db.conn, "backup_dir")?;
-    db.conn.restore(MAIN_DB, source, None::<fn(rusqlite::backup::Progress)>).map_err(|_| AppError::InvalidBackup)?;
-    // An older backup is brought up to the current schema.
-    db.prepare()?;
-    if !integrity(&db.conn)?.ok {
-        return Err(AppError::Integrity);
+    if let Err(e) = replace_and_check(db, source) {
+        // The copy turned out unusable: put the data from before the restore back.
+        // No integrity gate here: this is exactly what the user had a moment ago.
+        db.conn.restore(MAIN_DB, &safety_path, None::<fn(rusqlite::backup::Progress)>)?;
+        db.prepare()?;
+        return Err(e);
     }
     match folder {
         Some(folder) => settings::write(&db.conn, "backup_dir", &folder)?,
@@ -122,6 +124,17 @@ pub fn restore_from(db: &mut Database, source: &Path, backup_dir: &Path) -> AppR
     // The safety copy above is the latest backup
     settings::write(&db.conn, "last_backup_at", &now_millis())?;
     Ok(safety_name)
+}
+
+/// Copies `source` over the live database, brings it to the current schema and checks it.
+fn replace_and_check(db: &mut Database, source: &Path) -> AppResult<()> {
+    db.conn.restore(MAIN_DB, source, None::<fn(rusqlite::backup::Progress)>).map_err(|_| AppError::InvalidBackup)?;
+    // An older backup is brought up to the current schema.
+    db.prepare()?;
+    if !integrity(&db.conn)?.ok {
+        return Err(AppError::Integrity);
+    }
+    Ok(())
 }
 
 pub fn list(dir: &Path) -> AppResult<Vec<BackupFile>> {

@@ -4,7 +4,7 @@
 
 | Набор | Команда | Результат |
 |---|---|---|
-| Финансовое ядро и сценарии на SQLite | `npm run test:rust` | 60 из 60 |
+| Финансовое ядро и сценарии на SQLite | `npm run test:rust` | 62 из 62 |
 | Логика интерфейса (деньги, проценты) | `npm run test` | 11 из 11 |
 | UI-тесты в реальном приложении | `npm run e2e` | 11 из 11 |
 | TypeScript, ESLint, Clippy (`-D warnings`) | `npm run check` | без ошибок |

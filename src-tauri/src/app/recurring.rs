@@ -288,7 +288,8 @@ pub fn set_paused(conn: &mut Connection, workspace_id: &str, id: &str, paused: b
     } else {
         let after_last = next_open(&tx, id, &schedule)?;
         let from_today = schedule.first_on_or_after(today());
-        match after_last.max(from_today) {
+        // Nothing left from today on means the rule ended during the pause.
+        match after_last.zip(from_today).map(|(last, today)| last.max(today)) {
             Some(date) => ("active", format_date(date)),
             None => ("finished", old.next_date.clone()),
         }

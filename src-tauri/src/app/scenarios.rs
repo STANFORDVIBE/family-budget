@@ -364,6 +364,42 @@ fn recurring_payments_create_pending_operations_once() {
 }
 
 #[test]
+fn rule_that_ended_during_a_pause_finishes_instead_of_billing_the_pause() {
+    let mut f = fixture();
+    let ws = f.personal.id.clone();
+    let card = f.account(&ws, "Карта", "EUR", 100_000);
+    let housing = f.category(&ws, "Жильё");
+    let rule = recurring::create(
+        &mut f.db.conn,
+        &ws,
+        &RecurringInput {
+            id: None,
+            name: "Абонемент".into(),
+            kind: "expense".into(),
+            amount: 3_000,
+            account_id: card.id.clone(),
+            category_id: housing,
+            member_id: None,
+            comment: None,
+            interval_unit: "month".into(),
+            interval_count: 1,
+            start_date: "2025-01-15".into(),
+            end_date: Some("2025-06-30".into()),
+        },
+    )
+    .unwrap();
+    recurring::generate_due(&mut f.db.conn, &ws, parse_date("2025-03-20", "date").unwrap()).unwrap();
+    recurring::set_paused(&mut f.db.conn, &ws, &rule.id, true).unwrap();
+    // resumed long after the end date (today is past 2025)
+    let resumed = recurring::set_paused(&mut f.db.conn, &ws, &rule.id, false).unwrap();
+    assert_eq!(resumed.status, "finished");
+    assert_eq!(
+        recurring::generate_due(&mut f.db.conn, &ws, parse_date("2026-01-01", "date").unwrap()).unwrap().created,
+        0
+    );
+}
+
+#[test]
 fn goal_contributions_are_not_expenses() {
     let mut f = fixture();
     let ws = f.personal.id.clone();
@@ -418,6 +454,19 @@ fn goal_contributions_are_not_expenses() {
     // deleting the contribution returns the transferred money
     let list = goals::contributions(&f.db.conn, &ws, &goal.id).unwrap();
     let backed = list.iter().find(|c| c.transaction_id.is_some()).unwrap();
+    // editing the backing transfer moves the goal progress with it
+    let tx_id = backed.transaction_id.clone().unwrap();
+    let mut edited = transfer(&card.id, &savings.id, 15_000, None, 0);
+    edited.date = "2025-03-02".into();
+    transactions::update(&mut f.db.conn, &ws, &tx_id, &edited).unwrap();
+    assert_eq!(goals::get(&f.db.conn, &ws, &goal.id).unwrap().progress.current, 25_000);
+    // turning it into something else would orphan the contribution
+    let as_expense = expense(&card.id, 15_000, &f.category(&ws, "Продукты"), "2025-03-02");
+    assert!(matches!(
+        transactions::update(&mut f.db.conn, &ws, &tx_id, &as_expense),
+        Err(AppError::Conflict("goal_transfer"))
+    ));
+
     goals::delete_contribution(&mut f.db.conn, &ws, &backed.id).unwrap();
     assert_eq!(f.balance(&ws, &card.id), 100_000);
     assert_eq!(goals::get(&f.db.conn, &ws, &goal.id).unwrap().progress.current, 10_000);
@@ -713,6 +762,38 @@ fn restore_rejects_garbage_and_path_tricks() {
     assert!(backup::resolve(dir.path(), "C:\\Windows\\x.fbbak").is_err());
     let mut db = crate::db::Database::open_in_memory().unwrap();
     assert!(backup::restore_from(&mut db, &junk, dir.path()).is_err());
+}
+
+#[test]
+fn failed_restore_puts_the_current_data_back() {
+    let dir = tempfile::tempdir().unwrap();
+    // A copy that opens fine but breaks a ledger rule: an operation without entries.
+    let broken = dir.path().join("broken.fbbak");
+    {
+        let other = fixture();
+        let ws = &other.personal.id;
+        let user = current_user(&other.db.conn).unwrap();
+        other
+            .db
+            .conn
+            .execute(
+                "INSERT INTO transactions (id, workspace_id, kind, occurred_on, created_by, created_at, updated_at)
+                 VALUES (?1, ?2, 'expense', '2025-03-01', ?3, 0, 0)",
+                params![new_id(), ws, user],
+            )
+            .unwrap();
+        other.db.conn.backup(rusqlite::MAIN_DB, &broken, None::<fn(rusqlite::backup::Progress)>).unwrap();
+    }
+    assert!(backup::verify_file(&broken).is_ok());
+
+    let mut f = fixture();
+    let ws = f.personal.id.clone();
+    let card = f.account(&ws, "Карта", "EUR", 1_000);
+    let backups = dir.path().join("backups");
+    assert!(matches!(backup::restore_from(&mut f.db, &broken, &backups), Err(AppError::Integrity)));
+    // the live data is the one from before the restore attempt
+    assert_eq!(f.balance(&ws, &card.id), 1_000);
+    assert!(backup::integrity(&f.db.conn).unwrap().ok);
 }
 
 #[test]
