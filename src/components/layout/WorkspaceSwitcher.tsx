@@ -1,4 +1,4 @@
-import { Check, ChevronsUpDown, Plus, User, Users } from "lucide-react";
+import { Check, ChevronsUpDown, Pencil, Plus, Trash2, User, Users } from "lucide-react";
 import { useState } from "react";
 import { toast } from "sonner";
 import { ConfirmDialog } from "@/components/common/confirm-dialog";
@@ -40,14 +40,19 @@ export function WorkspaceSwitcher() {
   const workspaces = useApp((s) => s.workspaces);
   const [creating, setCreating] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
+  const [context, setContext] = useState<{
+    x: number;
+    y: number;
+    workspace: Workspace;
+  } | null>(null);
+  const [editing, setEditing] = useState<Workspace | null>(null);
   const [deleting, setDeleting] = useState<Workspace | null>(null);
 
-  function askDelete(event: React.MouseEvent, workspace: Workspace) {
+  /** Right click: a small menu at the pointer with "edit" and "delete". */
+  function openContext(event: React.MouseEvent, workspace: Workspace) {
     event.preventDefault();
-    // the last workspace cannot be deleted
-    if (workspaces.length < 2) return;
     setMenuOpen(false);
-    setDeleting(workspace);
+    setContext({ x: event.clientX, y: event.clientY, workspace });
   }
 
   const Icon = current.kind === "family" ? Users : User;
@@ -62,7 +67,7 @@ export function WorkspaceSwitcher() {
             // dismissed by the same event as an "outside" press, and the menu never showed
             onPointerDown={(e) => e.button === 0 && e.preventDefault()}
             onClick={() => setMenuOpen((open) => !open)}
-            onContextMenu={(e) => askDelete(e, current)}
+            onContextMenu={(e) => openContext(e, current)}
             className="flex w-full items-center gap-2.5 rounded-lg bg-sidebar-accent/60 px-2.5 py-2 text-left outline-none hover:bg-sidebar-accent focus-visible:ring-2 focus-visible:ring-sidebar-ring"
           >
             <span className="flex size-8 shrink-0 items-center justify-center rounded-md bg-primary text-primary-foreground">
@@ -71,7 +76,8 @@ export function WorkspaceSwitcher() {
             <span className="min-w-0 flex-1">
               <span className="block truncate text-sm font-medium">{current.name}</span>
               <span className="block truncate text-xs text-muted-foreground">
-                {current.kind === "family" ? L.workspace.familyShort : L.workspace.personalShort} · {current.baseCurrency}
+                {current.kind === "family" ? L.workspace.familyShort : L.workspace.personalShort} ·{" "}
+                {current.baseCurrency}
               </span>
             </span>
             <ChevronsUpDown className="size-4 text-muted-foreground" />
@@ -80,7 +86,7 @@ export function WorkspaceSwitcher() {
         <DropdownMenuContent className="w-64">
           <DropdownMenuLabel>{L.workspace.switchTitle}</DropdownMenuLabel>
           {workspaces.map((w) => (
-            <DropdownMenuItem key={w.id} onSelect={() => void activate(w.id)} onContextMenu={(e) => askDelete(e, w)}>
+            <DropdownMenuItem key={w.id} onSelect={() => void activate(w.id)} onContextMenu={(e) => openContext(e, w)}>
               {w.kind === "family" ? <Users /> : <User />}
               <span className="flex-1 truncate">{w.name}</span>
               {w.id === current.id && <Check className="text-primary" />}
@@ -94,8 +100,91 @@ export function WorkspaceSwitcher() {
         </DropdownMenuContent>
       </DropdownMenu>
       <CreateWorkspaceDialog open={creating} onOpenChange={setCreating} onCreated={(id) => void activate(id)} />
+      <DropdownMenu open={context !== null} onOpenChange={(open) => !open && setContext(null)}>
+        <DropdownMenuTrigger asChild>
+          {/* invisible anchor at the pointer: the menu opens where the user clicked */}
+          <span
+            aria-hidden
+            className="pointer-events-none fixed size-0"
+            style={{ left: context?.x, top: context?.y }}
+          />
+        </DropdownMenuTrigger>
+        <DropdownMenuContent align="start" className="w-48" data-testid="workspace-context-menu">
+          <DropdownMenuItem onSelect={() => setEditing(context?.workspace ?? null)}>
+            <Pencil />
+            {L.common.edit}
+          </DropdownMenuItem>
+          <DropdownMenuItem
+            variant="destructive"
+            // the last workspace cannot be deleted
+            disabled={workspaces.length < 2}
+            onSelect={() => setDeleting(context?.workspace ?? null)}
+          >
+            <Trash2 />
+            {L.common.delete}
+          </DropdownMenuItem>
+        </DropdownMenuContent>
+      </DropdownMenu>
+      <EditWorkspaceDialog workspace={editing} onClose={() => setEditing(null)} />
       <DeleteWorkspaceDialog workspace={deleting} onClose={() => setDeleting(null)} />
     </>
+  );
+}
+
+/** Renames a workspace. The base currency is changed in settings: it has its own rules. */
+function EditWorkspaceDialog({ workspace, onClose }: { workspace: Workspace | null; onClose: () => void }) {
+  return (
+    <Dialog open={workspace !== null} onOpenChange={(open) => !open && onClose()}>
+      <DialogContent>
+        {/* keyed: the field starts from the name of the workspace being edited */}
+        {workspace && <EditWorkspaceForm key={workspace.id} workspace={workspace} onClose={onClose} />}
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+function EditWorkspaceForm({ workspace, onClose }: { workspace: Workspace; onClose: () => void }) {
+  const L = useL();
+  const [name, setName] = useState(workspace.name);
+  const [busy, setBusy] = useState(false);
+
+  async function submit(event: React.FormEvent) {
+    event.preventDefault();
+    if (!name.trim() || busy) return;
+    setBusy(true);
+    try {
+      const updated = await api.updateWorkspace(workspace.id, {
+        name: name.trim(),
+        baseCurrency: workspace.baseCurrency,
+      });
+      const store = useApp.getState();
+      store.setWorkspaces(store.workspaces.map((w) => (w.id === updated.id ? updated : w)));
+      toast.success(L.common.saved);
+      onClose();
+    } catch (error) {
+      toast.error(errorMessage(error, L));
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <form onSubmit={submit} className="flex flex-col gap-4">
+      <DialogHeader>
+        <DialogTitle>{L.workspace.editTitle}</DialogTitle>
+      </DialogHeader>
+      <Field label={L.workspace.name} htmlFor="ws-edit-name">
+        <Input id="ws-edit-name" autoFocus value={name} maxLength={60} onChange={(e) => setName(e.target.value)} />
+      </Field>
+      <DialogFooter>
+        <Button type="button" variant="outline" onClick={onClose}>
+          {L.common.cancel}
+        </Button>
+        <Button type="submit" disabled={!name.trim() || name.trim() === workspace.name || busy}>
+          {L.common.save}
+        </Button>
+      </DialogFooter>
+    </form>
   );
 }
 
@@ -127,7 +216,9 @@ export function DeleteWorkspaceDialog({ workspace, onClose }: { workspace: Works
     <ConfirmDialog
       open={workspace !== null}
       onOpenChange={(open) => !open && onClose()}
-      title={fmt(L.settings.deleteWorkspaceTitle, { name: workspace?.name ?? "" })}
+      title={fmt(L.settings.deleteWorkspaceTitle, {
+        name: workspace?.name ?? "",
+      })}
       text={L.settings.deleteWorkspaceText}
       confirmLabel={L.common.delete}
       pending={busy}
@@ -157,7 +248,11 @@ function CreateWorkspaceDialog({
     if (!name.trim() || busy) return;
     setBusy(true);
     try {
-      const created = await api.createWorkspace({ name: name.trim(), kind, baseCurrency: currency });
+      const created = await api.createWorkspace({
+        name: name.trim(),
+        kind,
+        baseCurrency: currency,
+      });
       const store = useApp.getState();
       store.setWorkspaces([...store.workspaces, created]);
       toast.success(L.workspace.created);

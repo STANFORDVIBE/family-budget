@@ -26,6 +26,7 @@ export const ru = {
     switchTitle: "Пространства",
     create: "Новое пространство",
     createTitle: "Новое пространство",
+    editTitle: "Изменить пространство",
     name: "Название",
     kind: "Тип",
     baseCurrency: "Основная валюта",
