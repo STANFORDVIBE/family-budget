@@ -181,6 +181,12 @@ function General() {
           onCheckedChange={(hideAmounts) => void update({ hideAmounts })}
         />
       </Row>
+      <Row label={L.settings.navOrder} hint={L.settings.navOrderHint}>
+        <Button variant="outline" disabled={settings.navOrder.length === 0} onClick={() => void update({ navOrder: [] })}>
+          <RotateCcw />
+          {L.settings.navOrderReset}
+        </Button>
+      </Row>
     </Section>
   );
 }

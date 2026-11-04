@@ -16,17 +16,9 @@ import { TransactionDialog } from "@/features/transactions/TransactionDialog";
 import { TransactionsPage } from "@/features/transactions/TransactionsPage";
 import { fmt, useL } from "@/i18n";
 import { api } from "@/lib/api";
+import { MAIN_SECTIONS, orderSections } from "@/lib/nav";
 import { type Section, useApp } from "@/store/app";
 
-const HOTKEY_SECTIONS: Record<string, Section> = {
-  "1": "dashboard",
-  "2": "transactions",
-  "3": "accounts",
-  "4": "analytics",
-  "5": "budgets",
-  "6": "recurring",
-  "7": "goals",
-};
 
 export function AppShell({ onReload }: { onReload: () => Promise<void> }) {
   const workspaceId = useApp((s) => s.workspaceId);
@@ -113,9 +105,12 @@ function useHotkeys() {
       } else if (event.code === "KeyF" || key === "f") {
         event.preventDefault();
         state.focusSearch();
-      } else if (!event.shiftKey && HOTKEY_SECTIONS[event.key]) {
+      } else if (!event.shiftKey && /^[1-7]$/.test(event.key)) {
+        // Ctrl+1…7 follow the sidebar order the user arranged
+        const target = orderSections(MAIN_SECTIONS, state.settings?.navOrder ?? [])[Number(event.key) - 1];
+        if (!target) return;
         event.preventDefault();
-        state.go(HOTKEY_SECTIONS[event.key] as Section);
+        state.go(target);
       }
     }
     window.addEventListener("keydown", onKey);

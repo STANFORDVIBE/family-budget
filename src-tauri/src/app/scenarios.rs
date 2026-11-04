@@ -823,22 +823,37 @@ fn automatic_backup_runs_once_a_day_and_prunes() {
     let dir = tempfile::tempdir().unwrap();
     assert!(backup::auto_backup_if_due(&f.db.conn, dir.path()).unwrap().is_some());
     assert!(backup::auto_backup_if_due(&f.db.conn, dir.path()).unwrap().is_none());
-    settings::update(
-        &mut f.db.conn,
-        &settings::SettingsUpdate {
-            theme: None,
-            language: None,
-            date_format: None,
-            number_format: None,
-            hide_amounts: None,
-            auto_backup: Some(false),
-            backup_keep: None,
-            active_workspace_id: None,
-        },
-    )
-    .unwrap();
+    settings::update(&mut f.db.conn, &settings::SettingsUpdate { auto_backup: Some(false), ..Default::default() })
+        .unwrap();
     settings::write(&f.db.conn, "last_auto_backup_at", &0_i64).unwrap();
     assert!(backup::auto_backup_if_due(&f.db.conn, dir.path()).unwrap().is_none());
+}
+
+#[test]
+fn sidebar_order_is_saved_and_checked() {
+    let mut f = fixture();
+    assert!(settings::get(&f.db.conn).unwrap().nav_order.is_empty());
+    let order: Vec<String> = ["goals", "dashboard", "settings", "categories"].map(String::from).to_vec();
+    let saved = settings::update(
+        &mut f.db.conn,
+        &settings::SettingsUpdate { nav_order: Some(order.clone()), ..Default::default() },
+    )
+    .unwrap();
+    assert_eq!(saved.nav_order, order);
+    for bad in [vec!["dashboard", "dashboard"], vec!["dashboard", "<script>"]] {
+        let bad = bad.into_iter().map(String::from).collect();
+        assert!(
+            settings::update(&mut f.db.conn, &settings::SettingsUpdate { nav_order: Some(bad), ..Default::default() })
+                .is_err()
+        );
+    }
+    // an empty list is the reset to the default order
+    let reset = settings::update(
+        &mut f.db.conn,
+        &settings::SettingsUpdate { nav_order: Some(Vec::new()), ..Default::default() },
+    )
+    .unwrap();
+    assert!(reset.nav_order.is_empty());
 }
 
 #[test]

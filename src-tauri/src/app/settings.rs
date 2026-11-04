@@ -20,10 +20,26 @@ pub struct Settings {
     /// Chosen only through the system folder dialog, never typed in by the UI.
     pub backup_dir: Option<String>,
     pub active_workspace_id: Option<String>,
+    /// Order of the sidebar sections chosen by the user; empty means the default order.
+    pub nav_order: Vec<String>,
 }
 
+/// Sections the sidebar may be ordered by: a closed list, so nothing else ends up in the setting.
+const NAV_SECTIONS: &[&str] = &[
+    "dashboard",
+    "transactions",
+    "accounts",
+    "analytics",
+    "budgets",
+    "recurring",
+    "goals",
+    "members",
+    "categories",
+    "settings",
+];
+
 /// The part of the settings the UI may change directly.
-#[derive(Debug, Clone, Deserialize)]
+#[derive(Debug, Clone, Deserialize, Default)]
 #[serde(rename_all = "camelCase")]
 pub struct SettingsUpdate {
     pub theme: Option<String>,
@@ -34,6 +50,7 @@ pub struct SettingsUpdate {
     pub auto_backup: Option<bool>,
     pub backup_keep: Option<i64>,
     pub active_workspace_id: Option<String>,
+    pub nav_order: Option<Vec<String>>,
 }
 
 /// What the operation form remembers per workspace.
@@ -71,6 +88,7 @@ pub fn get(conn: &Connection) -> AppResult<Settings> {
         backup_keep: read(conn, "backup_keep")?.unwrap_or(20),
         backup_dir: read(conn, "backup_dir")?,
         active_workspace_id: read(conn, "active_workspace_id")?,
+        nav_order: read(conn, "nav_order")?.unwrap_or_default(),
     })
 }
 
@@ -117,6 +135,14 @@ pub fn update(conn: &mut Connection, input: &SettingsUpdate) -> AppResult<Settin
             return Err(AppError::Validation("active_workspace_id"));
         }
         write(&tx, "active_workspace_id", id)?;
+    }
+    if let Some(order) = &input.nav_order {
+        let known = order.iter().all(|s| NAV_SECTIONS.contains(&s.as_str()));
+        let unique = order.iter().enumerate().all(|(i, s)| !order[..i].contains(s));
+        if !known || !unique {
+            return Err(AppError::Validation("nav_order"));
+        }
+        write(&tx, "nav_order", order)?;
     }
     let settings = get(&tx)?;
     tx.commit()?;

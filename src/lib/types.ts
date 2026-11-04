@@ -47,6 +47,8 @@ export interface Settings {
   backupKeep: number;
   backupDir: string | null;
   activeWorkspaceId: string | null;
+  /** Sidebar order chosen by dragging; empty means the default order. */
+  navOrder: string[];
 }
 
 export interface Bootstrap {
