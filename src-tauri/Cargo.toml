@@ -1,6 +1,6 @@
 [package]
 name = "family-budget"
-version = "0.5.0"
+version = "0.6.0"
 description = "Учёт личных и семейных финансов"
 authors = ["Family Budget"]
 edition = "2024"
